@@ -136,17 +136,23 @@ public class GeneticAlgorithm {
         return evaluationResults;
     }
 
-    public final void optimize() {
+    public final void optimize(String cases) {
         int[] binaryLengths = computeBinaryLengths();
         int[] numberOfValues = computeNumberOfValues();
         List<Set<String>> population = createPopulation(binaryLengths, numberOfValues);
         List<String> chromosomes = combineGenesIntoChromosome(population);
         List<Double> results = ratePopulation(population, binaryLengths);
+        List<Double> resultsTournament = tournamentSelection(cases, results);
+        List<Double> resultsRanking = rankingMethod(cases, results);
+        List<Double> resultsRoulette = rouletteMethod(cases, results);
 
         for (int i = 0; i < results.size(); i++) {
             System.out.println("Chromosome: " + chromosomes.get(i)
                     + ", Rastrigin value: " + results.get(i));
         }
+        System.out.println("Tournament method: " + resultsTournament
+                + "\nRanking method: " + resultsRanking
+                + "\nRoulette method: " + resultsRoulette);
     }
 
     private List<List<Double>> transpose(List<List<Double>> matrix) {
@@ -164,6 +170,88 @@ public class GeneticAlgorithm {
         return transposed;
     }
 
+    public List<Double> tournamentSelection(String cases, List<Double> population) {
+        Random rnd = new Random();
+        List<Double> selectedIndividuals = new ArrayList<>();
+
+        for (int i = 0; i < N; i++) {
+            Set<Integer> indices = new HashSet<>();
+            List<Double> tournamentGroup = new ArrayList<>();
+
+            while (indices.size() < 2) {
+                int randomIndex = rnd.nextInt(population.size());
+                if (indices.add(randomIndex)) {
+                    tournamentGroup.add(population.get(randomIndex));
+                }
+            }
+            Double bestIndividual = 0.0;
+            if (cases.equals("max")) {
+                bestIndividual = Collections.max(tournamentGroup,
+                        Comparator.comparingDouble(Double::doubleValue));
+            } else if (cases.equals("min")) {
+                bestIndividual = Collections.min(tournamentGroup,
+                        Comparator.comparingDouble(Double::doubleValue));
+            }
+            selectedIndividuals.add(bestIndividual);
+        }
+
+        return selectedIndividuals;
+    }
+
+    private List<Double> rankingMethod(String cases, List<Double> rastriginResults) {
+        List<Double> result = new ArrayList<>();
+        Random rnd = new Random();
+
+        if (cases.equals("max")) {
+            rastriginResults.sort(Comparator.reverseOrder());
+        } else if (cases.equals("min")) {
+            rastriginResults.sort(Comparator.naturalOrder());
+        }
+
+        for (int i = 0; i < N; i++) {
+            int randomNumber = rnd.nextInt(N) + 1;
+            result.add(rastriginResults.get(rnd.nextInt(randomNumber)));
+        }
+
+        return result;
+    }
+
+    private List<Double> rouletteMethod(String cases, List<Double> rastriginResults) {
+        List<Double> q = new ArrayList<>();
+        List<Double> result = new ArrayList<>();
+        Random rnd = new Random();
+
+        double sum = rastriginResults.stream()
+                .mapToDouble(Double::doubleValue)
+                .sum();
+
+        double cumulativeProb = 0.0;
+        for (Double r : rastriginResults) {
+            cumulativeProb += r / sum;
+            q.add(cumulativeProb);
+        }
+
+        if (cases.equals("min")) {
+            q.sort(Comparator.reverseOrder());
+        }
+
+        for (int i = 0; i < N; i++) {
+            double randomNumber = rnd.nextDouble();
+            //TODO: code need adjustments for minimum optimization
+            for (int j = 0; j < q.size(); j++) {
+                if (q.get(j) < randomNumber && randomNumber <= q.get(j + 1)) {
+                    result.add(rastriginResults.get(j + 1));
+                    break;
+                } else if (randomNumber < q.get(j)) {
+                    result.add(rastriginResults.get(j));
+                    break;
+                }
+            }
+        }
+
+        return result;
+    }
+
     public static void main(String[] args) {
         double[] a = {-1, -1, -1};
         double[] b = {1, 1, 1};
@@ -171,6 +259,6 @@ public class GeneticAlgorithm {
         int N = 5;
 
         GeneticAlgorithm algorithm = new GeneticAlgorithm(a, b, d, N);
-        algorithm.optimize();
+        algorithm.optimize("max");
     }
 }
