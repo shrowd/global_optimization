@@ -27,6 +27,7 @@ public class GeneticAlgorithm {
         for (double xi : x) {
             sum += Math.pow(xi, 2) - A * Math.cos(W * xi);
         }
+
         return A * x.length + sum;
     }
 
@@ -96,6 +97,7 @@ public class GeneticAlgorithm {
 
             chromosomes.add(individual.toString());
         }
+
         return chromosomes;
     }
 
@@ -132,7 +134,6 @@ public class GeneticAlgorithm {
                         .doubleValue())
                 .forEach(evaluationResults::add);
 
-
         return evaluationResults;
     }
 
@@ -142,7 +143,7 @@ public class GeneticAlgorithm {
         List<Set<String>> population = createPopulation(binaryLengths, numberOfValues);
         List<String> chromosomes = combineGenesIntoChromosome(population);
         List<Double> results = ratePopulation(population, binaryLengths);
-        List<Double> resultsTournament = tournamentSelection(cases, results);
+        List<Double> resultsTournament = tournamentMethod(cases, results);
         List<Double> resultsRanking = rankingMethod(cases, results);
         List<Double> resultsRoulette = rouletteMethod(cases, results);
 
@@ -150,6 +151,7 @@ public class GeneticAlgorithm {
             System.out.println("Chromosome: " + chromosomes.get(i)
                     + ", Rastrigin value: " + results.get(i));
         }
+
         System.out.println("Tournament method: " + resultsTournament
                 + "\nRanking method: " + resultsRanking
                 + "\nRoulette method: " + resultsRoulette);
@@ -167,21 +169,22 @@ public class GeneticAlgorithm {
             }
             transposed.add(newRow);
         }
+
         return transposed;
     }
 
-    public List<Double> tournamentSelection(String cases, List<Double> population) {
+    public List<Double> tournamentMethod(String cases, List<Double> rastriginResults) {
         Random rnd = new Random();
-        List<Double> selectedIndividuals = new ArrayList<>();
+        List<Double> result = new ArrayList<>();
 
         for (int i = 0; i < N; i++) {
             Set<Integer> indices = new HashSet<>();
             List<Double> tournamentGroup = new ArrayList<>();
 
             while (indices.size() < 2) {
-                int randomIndex = rnd.nextInt(population.size());
+                int randomIndex = rnd.nextInt(rastriginResults.size());
                 if (indices.add(randomIndex)) {
-                    tournamentGroup.add(population.get(randomIndex));
+                    tournamentGroup.add(rastriginResults.get(randomIndex));
                 }
             }
             Double bestIndividual = 0.0;
@@ -192,25 +195,26 @@ public class GeneticAlgorithm {
                 bestIndividual = Collections.min(tournamentGroup,
                         Comparator.comparingDouble(Double::doubleValue));
             }
-            selectedIndividuals.add(bestIndividual);
+            result.add(bestIndividual);
         }
 
-        return selectedIndividuals;
+        return result;
     }
 
     private List<Double> rankingMethod(String cases, List<Double> rastriginResults) {
         List<Double> result = new ArrayList<>();
+        List<Double> rastriginResultsCopy = new ArrayList<>(rastriginResults);
         Random rnd = new Random();
 
         if (cases.equals("max")) {
-            rastriginResults.sort(Comparator.reverseOrder());
+            rastriginResultsCopy.sort(Comparator.reverseOrder());
         } else if (cases.equals("min")) {
-            rastriginResults.sort(Comparator.naturalOrder());
+            rastriginResultsCopy.sort(Comparator.naturalOrder());
         }
 
         for (int i = 0; i < N; i++) {
             int randomNumber = rnd.nextInt(N) + 1;
-            result.add(rastriginResults.get(rnd.nextInt(randomNumber)));
+            result.add(rastriginResultsCopy.get(rnd.nextInt(randomNumber)));
         }
 
         return result;
@@ -219,30 +223,33 @@ public class GeneticAlgorithm {
     private List<Double> rouletteMethod(String cases, List<Double> rastriginResults) {
         List<Double> q = new ArrayList<>();
         List<Double> result = new ArrayList<>();
+        List<Double> temp = new ArrayList<>();
         Random rnd = new Random();
+        double sum = 0.0;
 
-        double sum = rastriginResults.stream()
-                .mapToDouble(Double::doubleValue)
-                .sum();
+        if (cases.equals("min")) {
+            for (Double r : rastriginResults) {
+                double inverseValue = 1.0 / r;
+                temp.add(inverseValue);
+                sum += inverseValue;
+            }
+        } else if (cases.equals("max")) {
+            temp = rastriginResults;
+            sum = rastriginResults.stream()
+                    .mapToDouble(Double::doubleValue)
+                    .sum();
+        }
 
         double cumulativeProb = 0.0;
-        for (Double r : rastriginResults) {
+        for (Double r : temp) {
             cumulativeProb += r / sum;
             q.add(cumulativeProb);
         }
 
-        if (cases.equals("min")) {
-            q.sort(Comparator.reverseOrder());
-        }
-
         for (int i = 0; i < N; i++) {
             double randomNumber = rnd.nextDouble();
-            //TODO: code need adjustments for minimum optimization
             for (int j = 0; j < q.size(); j++) {
-                if (q.get(j) < randomNumber && randomNumber <= q.get(j + 1)) {
-                    result.add(rastriginResults.get(j + 1));
-                    break;
-                } else if (randomNumber < q.get(j)) {
+                if (randomNumber <= q.get(j)) {
                     result.add(rastriginResults.get(j));
                     break;
                 }
